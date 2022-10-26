@@ -13,6 +13,7 @@ jobs:
         run: cd gltf_pipeline && sh build.sh
       - name: test
         run: |
+          cd gltf_pipeline
           ./gltf_pipeline ./test/test.glb ./test/test.gltf
           ./gltf_pipeline ./test/test.glb ./test/test.b3dm
           ./gltf_pipeline ./test/test.b3dm ./test/a.gltf
