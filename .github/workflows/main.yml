@@ -7,8 +7,10 @@ jobs:
   build_and_test:
     runs-on: ubuntu-latest
     steps:
+      - name: checkout
+        run: git clone --recursive https://github.com/fanvanzh/gltf_pipeline.git
       - name: build
-        run: sh build.sh
+        run: cd gltf_pipeline && sh build.sh
       - name: test
         run: |
           ./gltf_pipeline ./test/test.glb ./test/test.gltf
