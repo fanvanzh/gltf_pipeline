@@ -1,0 +1,17 @@
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: build
+        run: sh build.sh
+      - name: test
+        run: |
+          ./gltf_pipeline ./test/test.glb ./test/test.gltf
+          ./gltf_pipeline ./test/test.glb ./test/test.b3dm
+          ./gltf_pipeline ./test/test.b3dm ./test/a.gltf
+        
