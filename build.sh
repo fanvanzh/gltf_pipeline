@@ -1,1 +1,1 @@
-g++ -I./tinygltf -std=c++11 main.cpp -o gltf_pipeline
+g++ -I./tinygltf -g -std=c++11 main.cpp -o gltf_pipeline

@@ -12,6 +12,31 @@ std::string toLower(std::string str)
     return str;
 }
 
+// read all into buffer from input file
+char* readFileBuffer(std::string input, long& fsize)
+{
+    FILE* f = fopen(input.c_str(), "rb");
+    if (!f)
+    {
+        printf("can`t open file: %s\n", input.c_str());
+        return NULL;
+    }
+    fseek(f, 0, SEEK_END);
+    fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char * buffer = new char[fsize + 1];
+    if (fsize != fread(buffer, 1, fsize, f))
+    {
+        printf("read file %s error\n", input.c_str());
+        fclose(f);
+        delete []buffer;
+        return NULL;
+    }
+    buffer[fsize] = 0;
+    fclose(f);
+    return buffer;
+}
+
 // convert glb to gltf json + image + bin
 int glbToGltf(std::string input, std::string output)
 {
@@ -32,7 +57,7 @@ int glbToGltf(std::string input, std::string output)
         return 1;
     }
 
-    std::string filename = input.substr(input.find_last_of('/') + 1);
+    std::string filename = output.substr(output.find_last_of('/') + 1);
     int img_idx = 0;
     for (auto & image: model.images)
     {
@@ -50,39 +75,33 @@ int glbToGltf(std::string input, std::string output)
             image.uri  = "./" + image.name + format;
     }
 
-    std::string outfile = input + ".gltf";
-    if (!gltf.WriteGltfSceneToFile(&model, outfile, false, false, true, false))
+    if (!gltf.WriteGltfSceneToFile(&model, output, false, false, true, false))
     {
-        printf("write gltf failed: %s \n", outfile.c_str());
+        printf("write gltf failed: %s \n", output.c_str());
         printf("error: %s\n", error.c_str());
         return 1;
     }
     return 0;
 }
 
-// read all into buffer from input file
-char* readFileBuffer(std::string input, long& fsize)
+// convert gltf to glb file
+int gltfToGlb(std::string input, std::string output)
 {
-    FILE* f = fopen(input.c_str(), "rb");
-    if (!f)
+    tinygltf::Model    model;
+    tinygltf::TinyGLTF gltf;
+    std::string error, warning;
+
+    if (!gltf.LoadASCIIFromFile(&model, &error, &warning, input))
     {
-        printf("can`t open file: %s\n", input.c_str());
-        return NULL;
+        printf("load gltf failed: %s\n", error.c_str());
+        return 1;
     }
-    fseek(f, 0, SEEK_END);
-    fsize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char * buffer = new char[fsize + 1];
-    if (fsize != fread(buffer, fsize, 1, f))
+    if (!gltf.WriteGltfSceneToFile(&model, output, true, true, false, true))
     {
-        printf("read file %s error\n", input.c_str());
-        fclose(f);
-        delete []buffer;
-        return NULL;
+        printf("write glb failed: %s\n", output.c_str());
+        return 1;
     }
-    buffer[fsize] = 0;
-    fclose(f);
-    return buffer;
+    return 0;
 }
 
 // convert b3dm to glb
@@ -105,7 +124,7 @@ int b3dmToGlb(std::string input, std::string output)
                     + *(int*)(buffer + 20) /* batch json len */
                     + *(int*)(buffer + 24); /* batch binary len */
     int glb_len = fsize - glb_offset;
-    if (glb_len != fwrite(buffer + glb_offset, glb_len, 1, f1))
+    if (glb_len != fwrite(buffer + glb_offset, 1, glb_len, f1))
     {
         printf("write file %s error\n", input.c_str());
         return 1;
@@ -138,7 +157,7 @@ int glbToB3dm(std::string input, std::string output)
         printf("can`t open file: %s\n", output.c_str());
         return 1;
     }
-    if (b3dmLen != fwrite(b3dmBuffer, b3dmLen, 1, f1))
+    if (b3dmLen != fwrite(b3dmBuffer, 1, b3dmLen, f1))
     {
         printf("write file %s error\n", input.c_str());
         return 1;
@@ -150,7 +169,7 @@ int glbToB3dm(std::string input, std::string output)
 
 int main(int argc, char** argv)
 {
-    if (argc < 2)
+    if (argc < 3)
     {
         printf("usage:\ngltf_pipeline a.glb/gltf/b3dm b.gltf/b3dm/glb.\n");
         return 1;
@@ -158,25 +177,54 @@ int main(int argc, char** argv)
 
     std::string input = argv[1];
     std::string output = argv[2];
-    std::string ext_in = input.substr(input.find_last_of('.') + 1);
-    std::string ext_out = output.substr(output.find_last_of('.') + 1);
+    std::string ext_in = toLower(input.substr(input.find_last_of('.') + 1));
+    std::string ext_out = toLower(output.substr(output.find_last_of('.') + 1));
     if (ext_in == ext_out)
     {
         printf("input and output are the same.\n");
         return 1;
     }
 
-    if (toLower(ext_in) == "glb")
+    if (ext_in == "glb")
     {
         if (ext_out == "gltf")
             return glbToGltf(input, output);
         else if (ext_out == "b3dm")
             return glbToB3dm(input, output);
     }
-    else if (toLower(ext_in) == "b3dm")
+    else if (ext_in == "b3dm")
     {
         if (ext_out == "glb")
             return b3dmToGlb(input, output);
+        else if (ext_out == "gltf")
+        {
+            std::string glb_path = output + ".glb";
+            if (0 == b3dmToGlb(input, glb_path))
+            {
+                int result = glbToGltf(glb_path, output);
+                // remove the tmp glb file
+                remove(glb_path.c_str());
+                return result;
+            }
+            return 1;
+        }
+    }
+    else if (ext_in == "gltf")
+    {
+        if (ext_out == "glb")
+            return gltfToGlb(input, output);
+        else if (ext_out == "b3dm")
+        {
+            std::string glb_path = output + ".glb";
+            if (0 == gltfToGlb(input, glb_path))
+            {
+                int result = glbToB3dm(glb_path, output);
+                // remove the tmp glb file
+                remove(glb_path.c_str());
+                return result;
+            }
+            return 1;
+        }
     }
 
     printf("input %s and output %s are not support now.\n", input.c_str(), output.c_str());

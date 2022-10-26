@@ -1,0 +1,1 @@
+CL -I./tinygltf -g -std=c++11 main.cpp -o gltf_pipeline.exe
