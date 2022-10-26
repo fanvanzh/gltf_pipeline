@@ -1,4 +1,6 @@
 # gltf_pipeline
+![github action](https://github.com/fanvanzh/gltf_pipeline/actions/workflows/main.yml/badge.svg)
+
 gltf pipeline is a tool for gltf/glb/b3dm convert
 
 ## usage:
